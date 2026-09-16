@@ -1,6 +1,6 @@
 {
   "name": "bashcage",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Allowlist guard for shell commands. Works as a Claude Code PreToolUse hook or as a command wrapper.",
   "type": "module",
   "license": "MIT",

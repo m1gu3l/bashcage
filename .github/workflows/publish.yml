@@ -26,6 +26,20 @@ jobs:
       # Staged publishing (`npm stage`) needs npm >= 11.15.0.
       - run: npm install -g npm@^11.15.0
 
+      # The release tag is the single source of truth for the version; the
+      # "version" field committed in package.json is a placeholder (0.0.0).
+      # Accepts tags like v1.2.3, 1.2.3 or v1.2.3-beta.1. This must run before
+      # the build: tsdown inlines package.json into dist/cli.js for --version.
+      - name: Set version from release tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! node -e "process.exit(/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(process.argv[1]) ? 0 : 1)" "$version"; then
+            echo "::error::Release tag '$GITHUB_REF_NAME' is not a semver version (expected e.g. v1.2.3)."
+            exit 1
+          fi
+          npm version "$version" --no-git-tag-version
+          echo "Publishing version $version"
+
       # `prepare` runs tsdown, so this also builds dist/.
       - run: pnpm install --frozen-lockfile
 
@@ -35,14 +49,22 @@ jobs:
       # the package to already exist on the registry. The very first release
       # falls back to a regular `npm publish`; every later release is staged
       # and must be approved with `npm stage approve <stage-id>`.
+      #
+      # Releases marked as pre-release on GitHub are published under the
+      # `next` dist-tag so they don't become the default install.
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           pkg="$(node -p "require('./package.json').name")"
+          tag_args=()
+          if [ "$PRERELEASE" = "true" ]; then
+            tag_args=(--tag next)
+          fi
           if npm view "$pkg" version >/dev/null 2>&1; then
-            npm stage publish
+            npm stage publish "${tag_args[@]}"
           else
             echo "$pkg is not on the registry yet; doing a regular publish."
-            npm publish --access public
+            npm publish --access public "${tag_args[@]}"
           fi
