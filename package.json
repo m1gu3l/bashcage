@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/m1gu3l/bashcage#readme",
   "bin": {
-    "bashcage": "./dist/cli.js"
+    "bashcage": "dist/cli.js"
   },
   "files": [
     "dist"
