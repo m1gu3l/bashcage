@@ -1,0 +1,15 @@
+{
+  "allow": [
+    "ls",
+    "pwd",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "grep",
+    "which",
+    "jq",
+    "git status",
+    "git log"
+  ]
+}

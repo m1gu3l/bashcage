@@ -1,0 +1,54 @@
+{
+  "name": "bashcage",
+  "version": "0.1.0",
+  "description": "Allowlist guard for shell commands. Works as a Claude Code PreToolUse hook or as a command wrapper.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Michal Przybys",
+  "keywords": [
+    "cli",
+    "shell",
+    "security",
+    "agent",
+    "ai",
+    "bash",
+    "claude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/m1gu3l/bashcage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/m1gu3l/bashcage/issues"
+  },
+  "homepage": "https://github.com/m1gu3l/bashcage#readme",
+  "bin": {
+    "bashcage": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "start": "node src/cli.ts",
+    "build": "tsdown",
+    "prepare": "tsdown",
+    "test": "node --test",
+    "typecheck": "tsc",
+    "check": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "@optique/core": "^1.2.7",
+    "@optique/run": "^1.2.7",
+    "mvdan-sh": "0.10.1"
+  },
+  "devDependencies": {
+    "@types/mvdan-sh": "^0.10.9",
+    "@types/node": "^26.5.1",
+    "tsdown": "^0.23.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@12.4.2"
+}
