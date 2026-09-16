@@ -1,0 +1,48 @@
+name: Publish to npm
+
+on:
+  release:
+    # `published` (rather than `created`) skips draft releases.
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Staged publishing (`npm stage`) needs npm >= 11.15.0.
+      - run: npm install -g npm@^11.15.0
+
+      # `prepare` runs tsdown, so this also builds dist/.
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm check
+
+      # Staged publishing (https://docs.npmjs.com/staged-publishing) requires
+      # the package to already exist on the registry. The very first release
+      # falls back to a regular `npm publish`; every later release is staged
+      # and must be approved with `npm stage approve <stage-id>`.
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          pkg="$(node -p "require('./package.json').name")"
+          if npm view "$pkg" version >/dev/null 2>&1; then
+            npm stage publish
+          else
+            echo "$pkg is not on the registry yet; doing a regular publish."
+            npm publish --access public
+          fi
