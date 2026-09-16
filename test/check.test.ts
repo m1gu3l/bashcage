@@ -67,6 +67,27 @@ test("multi-word entries match as prefixes", () => {
   blocked("git", /'git'/, allow);
 });
 
+test("bashcage's own read-only invocations need no entry", () => {
+  ok("bashcage --list", []);
+  ok("bashcage -l", []);
+  ok("./node_modules/.bin/bashcage --check 'rm -rf /'", []);
+  ok("bashcage -c git push", []);
+  ok("bashcage --config", []);
+  ok("bashcage --doctor", []);
+  ok("bashcage --init", []);
+  ok("bashcage --pre-tool-hook", []);
+  ok("bashcage --help", []);
+  ok("bashcage --version", []);
+  ok("bashcage --list && aws s3 ls");
+  // The wrapper form runs a command, so it is not exempt.
+  blocked("bashcage git status", /'bashcage'/, []);
+  blocked("bashcage -- --list", /'bashcage'/, []);
+  blocked("bashcage", /'bashcage'/, []);
+  blocked("$X/bashcage --list", /'\$X\/bashcage'/, []);
+  blocked("bashcage --list | tee out.txt", /'tee'/, []);
+  blocked("bashcage --list > out.txt", /redirection/, []);
+});
+
 test("blocks non-allowlisted commands", () => {
   blocked("npm install", /'npm'/);
   blocked("ls", /'ls'/);

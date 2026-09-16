@@ -63,6 +63,16 @@ test("--pre-tool-hook reads tool_input.command from stdin and does not run it", 
   assert.match(blocked.stderr, /'git'/);
 });
 
+test("--pre-tool-hook approves bashcage's read-only invocations without an entry", () => {
+  const hook = (command: string) => JSON.stringify({ tool_input: { command } });
+  assert.equal(bashcage(["--pre-tool-hook"], hook("./node_modules/.bin/bashcage --list")).status, 0);
+  assert.equal(bashcage(["--pre-tool-hook"], hook("bashcage --check 'rm -rf /'")).status, 0);
+  assert.equal(bashcage(["--pre-tool-hook"], hook("bashcage --help")).status, 0);
+  const wrapper = bashcage(["--pre-tool-hook"], hook("bashcage git push"));
+  assert.equal(wrapper.status, 2);
+  assert.match(wrapper.stderr, /'bashcage' is not allowed/);
+});
+
 test("--pre-tool-hook tolerates empty stdin and JSON without a command", () => {
   assert.equal(bashcage(["--pre-tool-hook"], "").status, 0);
   assert.equal(bashcage(["--pre-tool-hook"], "{}").status, 0);

@@ -12,7 +12,8 @@
  * when its leading words (after env assignments, with any path prefix stripped
  * from the program name) equal the entry's words. So "git add" allows
  * "git add -A" but not "git push". Only literal words can match: a word that
- * needs expansion, like `$X/ls`, never equals an entry.
+ * needs expansion, like `$X/ls`, never equals an entry. bashcage's own
+ * read-only invocations (READONLY_SELF) are allowed without an entry.
  *
  * Redirections are checked separately: anything that writes to a path other
  * than /dev/null is blocked, since it would turn a read-only allowlisted
@@ -230,6 +231,25 @@ export function redirectProblem(r: Redirect): string | null {
     : `redirection '${r.op}' to ${shown} is not allowed`;
 }
 
+/**
+ * bashcage's own invocations that run nothing. Always allowed, so an agent
+ * can inspect the guard without an allowlist entry. The wrapper form
+ * (`bashcage COMMAND`) is deliberately absent: it must be allowlisted like
+ * anything else.
+ */
+export const READONLY_SELF: readonly string[] = [
+  "bashcage --list",
+  "bashcage -l",
+  "bashcage --check",
+  "bashcage -c",
+  "bashcage --config",
+  "bashcage --doctor",
+  "bashcage --init",
+  "bashcage --pre-tool-hook",
+  "bashcage --help",
+  "bashcage --version",
+];
+
 /** An entry matches when its words equal the command's leading literal words. */
 function matchesEntry({ words, literalWords }: SimpleCommand, entry: string): boolean {
   const pattern = entry.trim().split(/\s+/).filter(Boolean);
@@ -251,6 +271,7 @@ export function check(cmd: string, allowed: readonly string[]): CheckResult {
       if (problem) return { ok: false, reason: `Blocked: ${problem}.` };
     }
     if (words.length === 0) continue;
+    if (READONLY_SELF.some((entry) => matchesEntry(command, entry))) continue;
     if (!allowed.some((entry) => matchesEntry(command, entry))) {
       return {
         ok: false,

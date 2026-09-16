@@ -25,7 +25,8 @@
  *
  * Allowlist: the "allow" array of the nearest .bashcage.json found walking up
  * from the working directory, else DEFAULT_ALLOWED in src/allowlist.ts.
- * Entries may be multi-word prefixes like "git add".
+ * Entries may be multi-word prefixes like "git add". bashcage's own read-only
+ * invocations (READONLY_SELF in src/check.ts) need no entry.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";

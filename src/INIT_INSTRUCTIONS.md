@@ -14,13 +14,13 @@ The command path may be relative: hooks run from the project directory.
 
 The allowlist is the `allow` array of the nearest `.bashcage.json`, looked up from the project directory upwards; `{{bin}} --config` prints which file is in use, if any.
 
-If the project already has one, leave it as it is unless the user asks to change it. Otherwise ask the user which commands they want to allow, then write `.bashcage.json` in the project root. A reasonable starting point is the built-in default plus bashcage itself:
+If the project already has one, leave it as it is unless the user asks to change it. Otherwise ask the user which commands they want to allow, then write `.bashcage.json` in the project root. A reasonable starting point is the built-in default:
 
 ```json
 {{defaultAllowJson}}
 ```
 
-Entries are command prefixes: `git add` allows `git add -A` but not `git push`. Only the leading words are checked, never the arguments, so keep the list to commands that are safe with any arguments. bashcage is safe to allow: as a wrapper it applies this same allowlist before running anything, and having it allowed lets you run `{{bin}} --list` and `{{bin}} --check` yourself. Suggest adding it if an existing list lacks it.
+Entries are command prefixes: `git add` allows `git add -A` but not `git push`. Only the leading words are checked, never the arguments, so keep the list to commands that are safe with any arguments. bashcage's own read-only invocations (`{{bin}} --list`, `{{bin}} --check`, `--config`, `--doctor`, `--help`, ...) are always allowed and need no entry, so you can inspect the guard yourself at any time.
 
 ## 3. Tell future sessions
 

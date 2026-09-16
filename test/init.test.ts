@@ -7,7 +7,7 @@ const CWD = "/proj";
 
 test("render fills placeholders and rejects unknown ones", () => {
   assert.equal(render("a {{x}} {{x}}{{y}}", { x: "1", y: "2" }), "a 1 12");
-  assert.throws(() => render("{{nope}}", {}), /unknown placeholder \{\{nope\}\}/);
+  assert.throws(() => render("{{nope}}", {}), /unknown placeholder \{\{nope}}/);
 });
 
 test("binCommand uses the project-local bin only when running from the project's node_modules", () => {
@@ -26,7 +26,7 @@ test("initInstructions fills in the bin, the hook JSON, and the default allowlis
   assert.match(local, /"command": "\.\/node_modules\/\.bin\/bashcage --pre-tool-hook"/);
   assert.match(local, /`\.\/node_modules\/\.bin\/bashcage --list`/);
   for (const entry of DEFAULT_ALLOWED) assert.ok(local.includes(`"${entry}"`), entry);
-  assert.match(local, /"bashcage"\n/);
+  assert.doesNotMatch(local, /"bashcage"\n/);
   assert.match(local, /\.claude\/settings\.json/);
   assert.match(local, /CLAUDE\.md/);
   assert.match(local, /\/hooks/);

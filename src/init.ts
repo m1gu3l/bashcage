@@ -29,7 +29,7 @@ export function binCommand(cwd: string, binPath: string): string {
 
 /** Replace every `{{name}}`; an unknown name is an error, not silent output. */
 export function render(template: string, vars: Record<string, string>, templateName = "INIT_INSTRUCTIONS.md"): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, name: string) => {
+  return template.replace(/\{\{(\w+)}}/g, (_, name: string) => {
     const value = vars[name];
     if (value === undefined) throw new Error(`${templateName}: unknown placeholder {{${name}}}`);
     return value;
@@ -42,6 +42,6 @@ export function initInstructions(cwd: string, binPath: string): string {
   return render(readFileSync(TEMPLATE_URL, "utf8"), {
     bin,
     hookJson: JSON.stringify({ hooks: { PreToolUse: [hook] } }, null, 2),
-    defaultAllowJson: JSON.stringify({ allow: [...DEFAULT_ALLOWED, "bashcage"] }, null, 2),
+    defaultAllowJson: JSON.stringify({ allow: DEFAULT_ALLOWED }, null, 2),
   });
 }
