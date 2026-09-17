@@ -57,7 +57,7 @@ That is one `docker` command. It mounts the host root filesystem into a
 container and runs arbitrary code as root against it. `docker exec` does the
 same to a running container. The program on the allowlist decides what the
 allowlist is worth, and `docker` is worth everything. The same is true of
-`bash`, `node`, `python`, `env`, `xargs`, `sudo`, `make`, `find -exec`,
+`bash`, `node`, `python`, `env`, `xargs`, `sudo`, `make`,
 `git -c core.pager=…`, and every other tool that can start another program.
 
 The lesson is not "docker is bad." It is that **allowing a program means
@@ -105,6 +105,14 @@ $ echo $?
 $ bashcage --check 'docker run --rm -v /:/host alpine sh'
 Blocked: 'docker' is not allowed. Allowed commands: docker ps, docker images, docker compose logs.
 ```
+
+**It follows `find` into `-exec`.** `find` is the one launcher bashcage
+understands: the command after `-exec`, `-execdir`, `-ok` or `-okdir` is
+lifted out and checked against the same allowlist, so `find . -exec grep foo
+{} \;` passes with `find` and `grep` allowed, while `find . -exec rm {} \;`
+is blocked on `rm`. Every argument to `find` must be literal, since `"$flag"`
+could expand to `-exec`. `-delete` is not covered: an entry for `find` still
+allows it.
 
 bashcage cannot decide for you that `docker ps` is safe and `docker run` is not
 — that is a judgment about the program. What it guarantees is that the guard

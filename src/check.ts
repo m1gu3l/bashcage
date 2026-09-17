@@ -29,6 +29,7 @@
  */
 import { Buffer } from "node:buffer";
 import sh from "mvdan-sh";
+import { findExecCommands, isFind } from "./find.ts";
 
 const { syntax } = sh;
 
@@ -281,7 +282,10 @@ export function check(cmd: string, allowed: readonly string[]): CheckResult {
   const parsed = parseCommand(cmd);
   if (!parsed.ok) return parsed;
 
-  for (const command of parsed.commands) {
+  // Commands that spawn other commands (`find -exec`) push those onto the
+  // queue, so nested commands are held to the same allowlist.
+  const queue = [...parsed.commands];
+  for (let command = queue.shift(); command !== undefined; command = queue.shift()) {
     const { words, redirects } = command;
     for (const r of redirects) {
       const problem = redirectProblem(r);
@@ -294,6 +298,11 @@ export function check(cmd: string, allowed: readonly string[]): CheckResult {
         ok: false,
         reason: `Blocked: '${words[0]}' is not allowed. Allowed commands: ${allowed.join(", ")}.`,
       };
+    }
+    if (isFind(command)) {
+      const nested = findExecCommands(command);
+      if (!nested.ok) return nested;
+      queue.push(...nested.commands);
     }
   }
   return { ok: true };
