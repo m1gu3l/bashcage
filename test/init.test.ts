@@ -1,6 +1,5 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_ALLOWED } from "../src/allowlist.ts";
 import { binCommand, initInstructions, render } from "../src/init.ts";
 
 const CWD = "/proj";
@@ -21,11 +20,11 @@ test("binCommand uses the project-local bin only when running from the project's
   assert.equal(binCommand(CWD, "/other/node_modules/bashcage/dist/cli.js"), "bashcage");
 });
 
-test("initInstructions fills in the bin, the hook JSON, and the default allowlist", () => {
+test("initInstructions fills in the bin and the hook JSON, with no built-in default", () => {
   const local = initInstructions(CWD, "/proj/node_modules/bashcage/dist/cli.js");
   assert.match(local, /"command": "\.\/node_modules\/\.bin\/bashcage --pre-tool-hook"/);
   assert.match(local, /`\.\/node_modules\/\.bin\/bashcage --list`/);
-  for (const entry of DEFAULT_ALLOWED) assert.ok(local.includes(`"${entry}"`), entry);
+  assert.match(local, /no built-in default/);
   assert.doesNotMatch(local, /"bashcage"\n/);
   assert.match(local, /\.claude\/settings\.json/);
   assert.match(local, /CLAUDE\.md/);

@@ -28,9 +28,10 @@
  * Nothing is written.
  *
  * Allowlist: the "allow" array of the nearest .bashcage.json found walking up
- * from the working directory, else DEFAULT_ALLOWED in src/allowlist.ts.
- * Entries may be multi-word prefixes like "git add". bashcage's own read-only
- * invocations (READONLY_SELF in src/check.ts) need no entry.
+ * from the working directory. There is no default; a missing file blocks
+ * every command until one is created (see --init). Entries may be multi-word
+ * prefixes like "git add". bashcage's own read-only invocations
+ * (READONLY_SELF in src/check.ts) need no entry.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -41,10 +42,10 @@ import { argument, option } from "@optique/core/primitives";
 import { string } from "@optique/core/valueparser";
 import { printError, run } from "@optique/run";
 import pkg from "../package.json" with { type: "json" };
-import { CONFIG_FILE, ConfigError, loadAllow, type LoadedAllow } from "./allowlist.ts";
+import { CONFIG_FILE, ConfigError, ConfigNotFoundError, loadAllow, type LoadedAllow } from "./allowlist.ts";
 import { check } from "./check.ts";
 import { doctorInstructions } from "./doctor.ts";
-import { initInstructions } from "./init.ts";
+import { binCommand, initInstructions } from "./init.ts";
 
 /**
  * Exit code for a blocked command. Claude Code treats 2 as "block" for a
@@ -55,24 +56,6 @@ import { initInstructions } from "./init.ts";
  */
 const EXIT_BLOCKED = 2;
 
-/** True once --pre-tool-hook is seen on argv, checked before option parsing runs. */
-const isHook = process.argv.includes("--pre-tool-hook");
-
-let loaded: LoadedAllow;
-try {
-  loaded = loadAllow(process.cwd());
-} catch (err) {
-  if (err instanceof ConfigError) {
-    if (isHook) {
-      process.stderr.write(err.message + "\n");
-      process.exit(EXIT_BLOCKED);
-    }
-    printError(message`${text(err.message)}`, { exitCode: 1 });
-  }
-  throw err;
-}
-const { allowed, source } = loaded;
-
 const parser = object({
   check: option("-c", "--check", {
     description: message`Only check COMMAND, do not run it.`,
@@ -81,13 +64,13 @@ const parser = object({
     description: message`Print the allowlist, one entry per line, and exit.`,
   }),
   config: option("--config", {
-    description: message`Print the path of the ${value(CONFIG_FILE)} in use and exit; exit 1 if none was found and the built-in default applies.`,
+    description: message`Print the path of the ${value(CONFIG_FILE)} in use and exit; exit 1 if none is found.`,
   }),
   preToolHook: option("--pre-tool-hook", {
     description: message`Read Claude Code PreToolUse hook JSON from stdin and only check its tool_input.command. Nothing is run.`,
   }),
   init: option("--init", {
-    description: message`Print setup instructions for Claude Code and exit; pipe them into claude to have it set this project up (bashcage --init | claude). Nothing is written.`,
+    description: message`Print setup instructions for Claude Code and exit; pipe them into claude to have it set this project up (bashcage --init | claude). Works even before ${value(CONFIG_FILE)} exists. Nothing is written.`,
   }),
   doctor: option("--doctor", {
     description: message`Print instructions for Claude Code to audit the active allowlist and exit; pipe them into claude to have it check that every entry is safe with any arguments (bashcage --doctor | claude). Nothing is written.`,
@@ -106,23 +89,40 @@ const opts = run(parser, {
   brief: message`Runs a shell command only if every simple command in it is on the allowlist.`,
 });
 
+// --init works before .bashcage.json exists, since it is how you create one.
+if (opts.init) {
+  process.stdout.write(initInstructions(process.cwd(), process.argv[1] ?? ""));
+  process.exit(0);
+}
+
+let loaded: LoadedAllow;
+try {
+  loaded = loadAllow(process.cwd());
+} catch (err) {
+  if (err instanceof ConfigError) {
+    // Point at the bin that actually works from this project, so the hint is
+    // not "bashcage" in a project where only ./node_modules/.bin has it.
+    const hint = err instanceof ConfigNotFoundError
+      ? `; run "${binCommand(process.cwd(), process.argv[1] ?? "")} --init" to set one up`
+      : "";
+    const msg = err.message + hint;
+    if (opts.preToolHook) {
+      process.stderr.write(msg + "\n");
+      process.exit(EXIT_BLOCKED);
+    }
+    printError(message`${text(msg)}`, { exitCode: 1 });
+  }
+  throw err;
+}
+const { allowed, path } = loaded;
+
 if (opts.list) {
   process.stdout.write(allowed.join("\n") + "\n");
   process.exit(0);
 }
 
 if (opts.config) {
-  if (source.kind === "file") {
-    process.stdout.write(source.path + "\n");
-    process.exit(0);
-  }
-  printError(message`no ${value(CONFIG_FILE)} found in ${value(process.cwd())} or its parents; using the built-in default allowlist`, {
-    exitCode: 1,
-  });
-}
-
-if (opts.init) {
-  process.stdout.write(initInstructions(process.cwd(), process.argv[1] ?? ""));
+  process.stdout.write(path + "\n");
   process.exit(0);
 }
 

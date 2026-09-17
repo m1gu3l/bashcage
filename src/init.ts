@@ -6,13 +6,13 @@
  * settings, writes the allowlist, and checks that the hook fires. The prose
  * lives in INIT_INSTRUCTIONS.md next to this file (copied into dist/ by the
  * build); this module only fills in the `{{placeholders}}` that must be
- * exact and in step with the code: the bin path, the hook JSON, and the
- * default allowlist. Anything that depends on the state of the project is
- * left to Claude to check.
+ * exact and in step with the code: the bin path and the hook JSON. There is
+ * no default allowlist to suggest; Claude asks the user what to allow.
+ * Anything that depends on the state of the project is left to Claude to
+ * check.
  */
 import { readFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { DEFAULT_ALLOWED } from "./allowlist.ts";
 
 /** Beside this module in src/, and beside the bundle in dist/ (see tsdown copy). */
 const TEMPLATE_URL = new URL("./INIT_INSTRUCTIONS.md", import.meta.url);
@@ -42,6 +42,5 @@ export function initInstructions(cwd: string, binPath: string): string {
   return render(readFileSync(TEMPLATE_URL, "utf8"), {
     bin,
     hookJson: JSON.stringify({ hooks: { PreToolUse: [hook] } }, null, 2),
-    defaultAllowJson: JSON.stringify({ allow: DEFAULT_ALLOWED }, null, 2),
   });
 }

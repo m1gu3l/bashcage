@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after } from "node:test";
-import { CONFIG_FILE, DEFAULT_ALLOWED } from "../src/allowlist.ts";
+import { CONFIG_FILE } from "../src/allowlist.ts";
 
 const BIN = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const ALLOW = ["echo", "true", "false", "git add"];
@@ -108,6 +108,19 @@ test("--init prints setup instructions for the project and writes nothing", () =
   assert.doesNotMatch(r.stdout, /\{\{/);
 });
 
+test("--init works even when no config file exists yet", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bashcage-noconf-init-"));
+  try {
+    const r = bashcage(["--init"], "", dir);
+    assert.equal(r.status, 0);
+    assert.equal(r.stderr, "");
+    assert.match(r.stdout, /"command": "bashcage --pre-tool-hook"/);
+    assert.doesNotMatch(r.stdout, /\{\{/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("--doctor prints audit instructions listing the active allowlist and writes nothing", () => {
   const r = bashcage(["--doctor"]);
   assert.equal(r.status, 0);
@@ -118,13 +131,13 @@ test("--doctor prints audit instructions listing the active allowlist and writes
   assert.doesNotMatch(r.stdout, /\{\{/);
 });
 
-test("--doctor says so when the built-in default allowlist is in use", () => {
+test("--doctor errors when no config file is found", () => {
   const dir = mkdtempSync(join(tmpdir(), "bashcage-noconf-"));
   try {
     const r = bashcage(["--doctor"], "", dir);
-    assert.equal(r.status, 0);
-    assert.match(r.stdout, /built-in default/);
-    for (const entry of DEFAULT_ALLOWED) assert.ok(r.stdout.includes(`- \`${entry}\``), entry);
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout, "");
+    assert.match(r.stderr, /\.bashcage\.json: not found/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -150,19 +163,35 @@ test("--config exits 1 and prints nothing to stdout when no config file is found
     const r = bashcage(["--config"], "", dir);
     assert.equal(r.status, 1);
     assert.equal(r.stdout, "");
-    assert.match(r.stderr, /no "\.bashcage\.json" found/);
+    assert.match(r.stderr, /\.bashcage\.json: not found/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("uses the default allowlist when no config file is found", () => {
+test("every command is blocked when no config file is found", () => {
   const dir = mkdtempSync(join(tmpdir(), "bashcage-noconf-"));
   try {
     const r = bashcage(["--list"], "", dir);
-    assert.equal(r.status, 0);
-    assert.equal(r.stdout, DEFAULT_ALLOWED.join("\n") + "\n");
-    assert.equal(bashcage(["-c", "echo hi"], "", dir).status, 2);
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout, "");
+    assert.match(r.stderr, /\.bashcage\.json: not found/);
+    // The hint names the bin as binCommand resolves it (not project-local here).
+    assert.match(r.stderr, /run "bashcage --init"/);
+    assert.equal(bashcage(["-c", "echo hi"], "", dir).status, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--pre-tool-hook blocks (not passes through) when no config file is found", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bashcage-noconf-hook-"));
+  try {
+    const hook = JSON.stringify({ tool_input: { command: "ls" } });
+    const r = bashcage(["--pre-tool-hook"], hook, dir);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /\.bashcage\.json: not found/);
+    assert.match(r.stderr, /run "bashcage --init"/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -2,44 +2,33 @@
  * Allowlist resolution.
  *
  * The allowlist is the "allow" array of the nearest .bashcage.json found by
- * walking up from the working directory, or DEFAULT_ALLOWED when there is no
- * such file. A file that exists but cannot be used is an error, never a
- * silent fallback, so a typo cannot quietly change what is allowed.
+ * walking up from the working directory. There is no default: a missing
+ * config file is an error, just like one that exists but cannot be used, so
+ * a project can never run commands without an explicit, reviewed allowlist.
  *
  * Parsing is separated from file access so it can be unit tested directly.
  */
 import { readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-/**
- * Used when no config file is found: a read-only floor for looking around a
- * project. Only leading words are matched, so every entry must be safe with
- * any arguments; nothing here writes files or runs other programs.
- */
-export const DEFAULT_ALLOWED: readonly string[] = [
-  "ls",
-  "pwd",
-  "cat",
-  "head",
-  "tail",
-  "wc",
-  "grep",
-  "which",
-  "jq",
-  "git status",
-  "git log"
-];
-
 /** Name of the config file looked up from the working directory upwards. */
 export const CONFIG_FILE = ".bashcage.json";
 
-/** Thrown when a config file exists but cannot be used. */
+/** Thrown when the config file is missing or cannot be used. */
 export class ConfigError extends Error {
   readonly path: string;
   constructor(path: string, detail: string) {
     super(`${path}: ${detail}`);
     this.name = "ConfigError";
     this.path = path;
+  }
+}
+
+/** Thrown when no config file is found in the working directory or its parents. */
+export class ConfigNotFoundError extends ConfigError {
+  constructor(cwd: string) {
+    super(CONFIG_FILE, `not found in ${cwd} or its parents`);
+    this.name = "ConfigNotFoundError";
   }
 }
 
@@ -91,23 +80,22 @@ export function findConfig(startDir: string): string | null {
   }
 }
 
-/** Where the active allowlist came from, for --help. */
-export type AllowSource = { kind: "file"; path: string } | { kind: "default" };
-
-export type LoadedAllow = { allowed: readonly string[]; source: AllowSource };
+/** The active allowlist and the config file it came from. */
+export type LoadedAllow = { allowed: readonly string[]; path: string };
 
 /**
- * Load the allowlist for a working directory: the nearest config file, else
- * the default. Throws ConfigError if a config file is found but unusable.
+ * Load the allowlist for a working directory: the nearest config file.
+ * Throws ConfigNotFoundError if none is found, or ConfigError if one is
+ * found but unusable.
  */
 export function loadAllow(cwd: string): LoadedAllow {
   const path = findConfig(cwd);
-  if (path === null) return { allowed: DEFAULT_ALLOWED, source: { kind: "default" } };
+  if (path === null) throw new ConfigNotFoundError(cwd);
   let text: string;
   try {
     text = readFileSync(path, "utf8");
   } catch (err) {
     throw new ConfigError(path, `cannot read: ${err instanceof Error ? err.message : String(err)}`);
   }
-  return { allowed: parseConfig(text, path), source: { kind: "file", path } };
+  return { allowed: parseConfig(text, path), path };
 }

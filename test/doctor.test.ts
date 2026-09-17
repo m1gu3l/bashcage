@@ -1,21 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_ALLOWED, type LoadedAllow } from "../src/allowlist.ts";
+import { type LoadedAllow } from "../src/allowlist.ts";
 import { allowList, doctorInstructions, sourceNote } from "../src/doctor.ts";
 
 const CWD = "/proj";
-const FROM_FILE: LoadedAllow = { allowed: ["ls", "git add", "npm"], source: { kind: "file", path: "/proj/.bashcage.json" } };
-const FROM_DEFAULT: LoadedAllow = { allowed: DEFAULT_ALLOWED, source: { kind: "default" } };
+const FROM_FILE: LoadedAllow = { allowed: ["ls", "git add", "npm"], path: "/proj/.bashcage.json" };
 
-test("sourceNote names the config file in use, or says the default applies", () => {
+test("sourceNote names the config file in use", () => {
   const file = sourceNote(FROM_FILE, "bashcage");
   assert.match(file, /`\/proj\/\.bashcage\.json`/);
   assert.match(file, /`bashcage --config`/);
-  assert.doesNotMatch(file, /built-in default/);
-
-  const def = sourceNote(FROM_DEFAULT, "bashcage");
-  assert.match(def, /built-in default/);
-  assert.match(def, /creating `\.bashcage\.json`/);
 });
 
 test("allowList renders one entry per line, or a note when empty", () => {
@@ -37,9 +31,8 @@ test("doctorInstructions fills in the bin, the source, and every entry", () => {
   assert.match(local, /Do not edit any file until the user has agreed/);
   assert.doesNotMatch(local, /\{\{/);
 
-  const global = doctorInstructions(CWD, "/usr/local/lib/node_modules/bashcage/dist/cli.js", FROM_DEFAULT);
+  const global = doctorInstructions(CWD, "/usr/local/lib/node_modules/bashcage/dist/cli.js", FROM_FILE);
   assert.match(global, /`bashcage --check '<command>'`/);
-  assert.match(global, /built-in default/);
-  for (const entry of DEFAULT_ALLOWED) assert.ok(global.includes(`- \`${entry}\`\n`) || global.endsWith(`- \`${entry}\``), entry);
+  for (const entry of FROM_FILE.allowed) assert.ok(global.includes(`- \`${entry}\`\n`) || global.endsWith(`- \`${entry}\``), entry);
   assert.doesNotMatch(global, /\{\{/);
 });

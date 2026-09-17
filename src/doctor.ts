@@ -18,10 +18,7 @@ const TEMPLATE_URL = new URL("./DOCTOR_INSTRUCTIONS.md", import.meta.url);
 
 /** One sentence on where the allowlist came from, for the top of the audit. */
 export function sourceNote(loaded: LoadedAllow, bin: string): string {
-  if (loaded.source.kind === "file") {
-    return `These are the entries of the \`allow\` array in \`${loaded.source.path}\`, the nearest \`${CONFIG_FILE}\` looked up from the project directory upwards (\`${bin} --config\` prints this path).`;
-  }
-  return `No \`${CONFIG_FILE}\` was found in the project directory or its parents, so bashcage is using its built-in default allowlist, a read-only floor for looking around a project. Any change you propose means creating \`${CONFIG_FILE}\` in the project root with an \`allow\` array.`;
+  return `These are the entries of the \`allow\` array in \`${loaded.path}\`, the nearest \`${CONFIG_FILE}\` looked up from the project directory upwards (\`${bin} --config\` prints this path).`;
 }
 
 /** The entries as a Markdown list, or a note when there are none. */

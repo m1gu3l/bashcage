@@ -6,7 +6,7 @@ import { join } from "node:path";
 import {
   CONFIG_FILE,
   ConfigError,
-  DEFAULT_ALLOWED,
+  ConfigNotFoundError,
   findConfig,
   loadAllow,
   parseConfig,
@@ -32,7 +32,7 @@ test("parseConfig rejects anything that is not { allow: string[] }", () => {
   rejects("null", /expected an object/);
   rejects("{}", /"allow" must be an array/);
   rejects('{ "allow": "git add" }', /"allow" must be an array/);
-  rejects('{ "allow": ["ls", 42] }', /"allow"\[1\] must be a string/);
+  rejects('{ "allow": ["ls", 42] }', /"allow"\[1] must be a string/);
 });
 
 function withTempDir(fn: (dir: string) => void) {
@@ -65,13 +65,20 @@ test("findConfig ignores a directory with the config file's name", () => {
   });
 });
 
-test("loadAllow uses the config file, else the default", () => {
+test("loadAllow requires a config file to be present", () => {
   withTempDir((dir) => {
-    assert.deepEqual(loadAllow(dir), { allowed: DEFAULT_ALLOWED, source: { kind: "default" } });
+    assert.throws(() => loadAllow(dir), (err: unknown) => {
+      assert.ok(err instanceof ConfigNotFoundError);
+      assert.ok(err instanceof ConfigError);
+      assert.match(err.message, /not found/);
+      // CLI advice belongs to the CLI, which knows the right bin for the project.
+      assert.doesNotMatch(err.message, /--init/);
+      return true;
+    });
 
     const path = join(dir, CONFIG_FILE);
     writeFileSync(path, '{ "allow": ["git add"] }');
-    assert.deepEqual(loadAllow(dir), { allowed: ["git add"], source: { kind: "file", path } });
+    assert.deepEqual(loadAllow(dir), { allowed: ["git add"], path });
 
     writeFileSync(path, "{");
     assert.throws(() => loadAllow(dir), ConfigError);

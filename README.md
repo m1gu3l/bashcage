@@ -119,9 +119,10 @@ bashcage --init | claude     # register the PreToolUse hook and write .bashcage.
 ```
 
 The allowlist is the `allow` array of the nearest `.bashcage.json`, looked up
-from the working directory upward; with no such file a small read-only default
-applies. `bashcage --config` prints which file is in use, and `bashcage --list`
-prints the active list. bashcage's own read-only invocations (`--list`,
-`--check`, `--config`, `--doctor`, `--init`, `--help`, `--version`) are always
-allowed without an entry, so the agent can always inspect the guard; the
-wrapper form `bashcage COMMAND` is not exempt.
+from the working directory upward. There is no default: with no such file,
+bashcage blocks every command (`--init` still works, since it is how you
+create one). `bashcage --config` prints which file is in use, and
+`bashcage --list` prints the active list. bashcage's own read-only
+invocations (`--list`, `--check`, `--config`, `--doctor`, `--init`, `--help`,
+`--version`) are always allowed without an entry, so the agent can always
+inspect the guard; the wrapper form `bashcage COMMAND` is not exempt.
