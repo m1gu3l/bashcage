@@ -20,7 +20,7 @@ If the project already has one, leave it as it is unless the user asks to change
 { "allow": ["ls", "git status", "git log"] }
 ```
 
-Entries are command prefixes: `git add` allows `git add -A` but not `git push`. Only the leading words are checked, never the arguments, so keep the list to commands that are safe with any arguments. bashcage's own read-only invocations (`{{bin}} --list`, `{{bin}} --check`, `--config`, `--doctor`, `--help`, ...) are always allowed and need no entry, so you can inspect the guard yourself at any time.
+Entries are command prefixes: `git add` allows `git add -A` but not `git push`. Only the leading words are checked, never the arguments, so keep the list to commands that are safe with any arguments. Leading environment assignments like `FOO=1 cmd` are always blocked, because `PATH=`, `LD_PRELOAD=` or `GIT_EXTERNAL_DIFF=` would change what an allowlisted name actually runs. bashcage's own read-only invocations (`{{bin}} --list`, `{{bin}} --check`, `--config`, `--doctor`, `--help`, ...) are always allowed and need no entry, so you can inspect the guard yourself at any time.
 
 ## 3. Tell future sessions
 

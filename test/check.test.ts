@@ -34,10 +34,23 @@ test("allows chains and pipes of allowlisted commands", () => {
   ok("aws s3 ls &");
 });
 
-test("allows env var prefixes and absolute paths", () => {
-  ok("AWS_PROFILE=dev cdk diff");
-  ok("AWS_PROFILE=dev AWS_REGION=eu-west-1 aws s3 ls");
+test("allows absolute paths to the program", () => {
   ok("/usr/local/bin/aws s3 ls");
+});
+
+test("blocks environment assignments, which change what an allowlisted name runs", () => {
+  blocked("PATH=/tmp cdk diff", /environment assignment 'PATH=\.\.\.'/);
+  blocked("LD_PRELOAD=/tmp/x.so aws s3 ls", /environment assignment 'LD_PRELOAD=\.\.\.'/);
+  blocked("AWS_PROFILE=dev cdk diff", /environment assignment 'AWS_PROFILE=\.\.\.'/);
+  blocked("AWS_PROFILE=dev AWS_REGION=eu-west-1 aws s3 ls", /'AWS_PROFILE=\.\.\.'/);
+  // Also on their own, and regardless of what the value is.
+  blocked("FOO=1", /environment assignment 'FOO=\.\.\.'/);
+  blocked("FOO=1; aws s3 ls", /environment assignment 'FOO=\.\.\.'/);
+  blocked('X="$Y" aws s3 ls', /environment assignment 'X=\.\.\.'/);
+  blocked("X= aws s3 ls", /environment assignment 'X=\.\.\.'/);
+  blocked("X+=1 aws s3 ls", /environment assignment 'X=\.\.\.'/);
+  blocked("aws s3 ls | FOO=1 jq .", /environment assignment 'FOO=\.\.\.'/);
+  assert.equal(parseCommand("FOO=1").ok, false);
 });
 
 test("does not split inside quotes", () => {
@@ -61,7 +74,8 @@ test("multi-word entries match as prefixes", () => {
   const allow = ["git add", "git status", "ls"];
   ok("git add -A", allow);
   ok("git status --short && ls -la", allow);
-  ok("GIT_DIR=.git git add .", allow);
+  blocked("GIT_DIR=.git git add .", /environment assignment 'GIT_DIR=\.\.\.'/, allow);
+  blocked("GIT_EXTERNAL_DIFF=/tmp/x git status", /'GIT_EXTERNAL_DIFF=\.\.\.'/, allow);
   blocked("git push", /'git'/, allow);
   blocked("git add . && git commit -m x", /'git'/, allow);
   blocked("git", /'git'/, allow);
@@ -189,7 +203,7 @@ test("blocks redirections that write to a path", () => {
 });
 
 test("parseCommand separates words from redirections", () => {
-  assert.deepEqual(commands("FOO='a b' ls -la 2>&1 >out <in"), [
+  assert.deepEqual(commands("ls -la 2>&1 >out <in"), [
     {
       words: ["ls", "-la"],
       literalWords: 2,
@@ -217,10 +231,9 @@ test("parseCommand separates words from redirections", () => {
 });
 
 test("parseCommand unquotes literal words and strips the program's directory", () => {
-  const [cmd] = commands("FOO=1 BAR=2 /usr/bin/aws 's3' \"ls\" $X \"a$X\" more");
+  const [cmd] = commands("/usr/bin/aws 's3' \"ls\" $X \"a$X\" more");
   assert.deepEqual(cmd?.words, ["aws", "s3", "ls", "$X", '"a$X"', "more"]);
   assert.equal(cmd?.literalWords, 3);
-  assert.deepEqual(commands("FOO=1"), [{ words: [], literalWords: 0, redirects: [] }]);
 });
 
 test("parseCommand keeps byte offsets straight in non-ASCII commands", () => {

@@ -75,7 +75,9 @@ parameter expansions, and harmless redirections. Command substitution,
 process substitution, subshells, command groups, functions, loops, and
 arithmetic are blocked *by construction* — there is no denylist to keep
 complete. Every simple command in a pipeline or chain is checked on its own,
-and any write redirection to a path other than `/dev/null` is refused. So the
+any write redirection to a path other than `/dev/null` is refused, and so is
+any leading environment assignment, since `PATH=/tmp ls` or
+`LD_PRELOAD=x.so ls` would change what an allowlisted name runs. So the
 whole first category above is rejected before matching even begins:
 
 ```

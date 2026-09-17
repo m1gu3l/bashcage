@@ -9,11 +9,18 @@
  * is blocked by construction, so there is no denylist to keep complete.
  *
  * An allowlist entry is one or more words. A simple command matches an entry
- * when its leading words (after env assignments, with any path prefix stripped
- * from the program name) equal the entry's words. So "git add" allows
- * "git add -A" but not "git push". Only literal words can match: a word that
- * needs expansion, like `$X/ls`, never equals an entry. bashcage's own
- * read-only invocations (READONLY_SELF) are allowed without an entry.
+ * when its leading words (with any path prefix stripped from the program
+ * name) equal the entry's words. So "git add" allows "git add -A" but not
+ * "git push". Only literal words can match: a word that needs expansion, like
+ * `$X/ls`, never equals an entry. bashcage's own read-only invocations
+ * (READONLY_SELF) are allowed without an entry.
+ *
+ * Leading environment assignments are blocked outright, including on their
+ * own (`FOO=1`). `PATH=/tmp ls`, `LD_PRELOAD=x.so ls` or
+ * `GIT_EXTERNAL_DIFF=x git diff` all change which code runs under an
+ * allowlisted name, so no entry could be safe with any arguments if they were
+ * let through, and a denylist of dangerous variable names could never be
+ * complete.
  *
  * Redirections are checked separately: anything that writes to a path other
  * than /dev/null is blocked, since it would turn a read-only allowlisted
@@ -51,7 +58,6 @@ const ALLOWED_NODES: ReadonlySet<string> = new Set([
   "Stmt",
   "CallExpr",
   "BinaryCmd",
-  "Assign",
   "Redirect",
   "Word",
   "Lit",
@@ -65,6 +71,7 @@ const ALLOWED_NODES: ReadonlySet<string> = new Set([
 
 /** Readable names for the blocked node types people are likely to hit. */
 const NODE_NAMES: Readonly<Record<string, string>> = {
+  Assign: "environment assignment",
   CmdSubst: "command substitution $(...)",
   ProcSubst: "process substitution <(...)",
   Subshell: "subshell (...)",
@@ -177,7 +184,17 @@ export function parseCommand(cmd: string): ParseResult {
     let literalWords = 0;
     const isCall = stmt.Cmd !== null && syntax.NodeType(stmt.Cmd) === "CallExpr";
     if (isCall) {
-      const args = (stmt.Cmd as sh.CallExpr).Args.filter((w): w is sh.Word => w !== null);
+      const call = stmt.Cmd as sh.CallExpr;
+      // Checked here rather than left to the Assign node so the reason can
+      // name the variable. Assign is not in ALLOWED_NODES either, so nothing
+      // slips through if the parser ever places one elsewhere.
+      const assign = call.Assigns.find((a): a is sh.Assign => a !== null);
+      if (assign) {
+        const name = assign.Name?.Value;
+        problem = `Blocked: environment assignment '${name ? `${name}=...` : source(assign)}' is not allowed.`;
+        return false;
+      }
+      const args = call.Args.filter((w): w is sh.Word => w !== null);
       for (const [i, arg] of args.entries()) {
         const literal = literalText(arg);
         if (literal !== null && literalWords === i) literalWords = i + 1;
@@ -197,7 +214,7 @@ export function parseCommand(cmd: string): ParseResult {
     }
     // A statement wrapping a pipeline or chain is not a command itself; its
     // parts are visited as their own statements. Redirect-only statements
-    // (`> file`) and assignment-only ones (`FOO=1`) are commands.
+    // (`> file`) are commands.
     if (isCall || stmt.Cmd === null || redirects.length > 0) {
       commands.push({ words, literalWords, redirects });
     }
