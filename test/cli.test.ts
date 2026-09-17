@@ -79,15 +79,15 @@ test("--pre-tool-hook tolerates empty stdin and JSON without a command", () => {
   assert.equal(bashcage(["--pre-tool-hook"], '{"tool_input":{"command":42}}').status, 0);
 });
 
-test("--pre-tool-hook rejects stdin that is not JSON", () => {
+test("--pre-tool-hook rejects stdin that is not JSON by blocking, not letting it through", () => {
   const r = bashcage(["--pre-tool-hook"], "not json");
-  assert.equal(r.status, 1);
+  assert.equal(r.status, 2);
   assert.match(r.stderr, /not valid hook JSON/);
 });
 
-test("--pre-tool-hook and COMMAND are mutually exclusive", () => {
+test("--pre-tool-hook and COMMAND are mutually exclusive, and blocks rather than passing through", () => {
   const r = bashcage(["--pre-tool-hook", "echo", "hi"]);
-  assert.equal(r.status, 1);
+  assert.equal(r.status, 2);
   assert.equal(r.stdout, "");
   assert.match(r.stderr, /takes no COMMAND/);
 });
@@ -175,6 +175,19 @@ test("a broken config file is an error, not a fallback", () => {
     const r = bashcage(["-c", "ls"], "", dir);
     assert.equal(r.status, 1);
     assert.match(r.stderr, /\.bashcage\.json: "allow" must be an array of strings/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--pre-tool-hook blocks (not passes through) when the config file is broken", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bashcage-badconf-hook-"));
+  try {
+    writeFileSync(join(dir, CONFIG_FILE), '{ "allow": ["ls"] }x');
+    const hook = JSON.stringify({ tool_input: { command: "ls" } });
+    const r = bashcage(["--pre-tool-hook"], hook, dir);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /\.bashcage\.json: not valid JSON/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

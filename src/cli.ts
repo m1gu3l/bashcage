@@ -15,6 +15,10 @@
  *
  * `bashcage --pre-tool-hook` reads Claude Code hook JSON on stdin, checks
  * tool_input.command, and exits 0 to pass or 2 to block. Nothing is run.
+ * Anything that stops it from vouching for the command — a broken config
+ * file, unparseable stdin, a malformed invocation — also exits 2: fail
+ * closed, since Claude Code treats any exit code other than 0 or 2 as a
+ * non-blocking hook error and lets the tool call through anyway.
  *
  * `bashcage --init` prints setup instructions for Claude Code, meant to be
  * piped into claude. Nothing is written.
@@ -42,14 +46,29 @@ import { check } from "./check.ts";
 import { doctorInstructions } from "./doctor.ts";
 import { initInstructions } from "./init.ts";
 
-/** Exit code for a blocked command. Claude Code treats 2 as "block". */
+/**
+ * Exit code for a blocked command. Claude Code treats 2 as "block" for a
+ * PreToolUse hook; any other non-zero code is a non-blocking hook error that
+ * lets the tool call through. So under --pre-tool-hook, every path that
+ * cannot vouch for the command (a broken config, unreadable stdin) must exit
+ * 2, never 1, or the guard fails open instead of closed.
+ */
 const EXIT_BLOCKED = 2;
+
+/** True once --pre-tool-hook is seen on argv, checked before option parsing runs. */
+const isHook = process.argv.includes("--pre-tool-hook");
 
 let loaded: LoadedAllow;
 try {
   loaded = loadAllow(process.cwd());
 } catch (err) {
-  if (err instanceof ConfigError) printError(message`${text(err.message)}`, { exitCode: 1 });
+  if (err instanceof ConfigError) {
+    if (isHook) {
+      process.stderr.write(err.message + "\n");
+      process.exit(EXIT_BLOCKED);
+    }
+    printError(message`${text(err.message)}`, { exitCode: 1 });
+  }
   throw err;
 }
 const { allowed, source } = loaded;
@@ -126,7 +145,8 @@ function readHookCommand(): string {
   try {
     data = JSON.parse(input);
   } catch {
-    return printError(message`stdin was not valid hook JSON`, { exitCode: 1 });
+    process.stderr.write("stdin was not valid hook JSON\n");
+    process.exit(EXIT_BLOCKED);
   }
   if (typeof data !== "object" || data === null) return "";
   const toolInput = (data as { tool_input?: unknown }).tool_input;
@@ -136,7 +156,8 @@ function readHookCommand(): string {
 }
 
 if (opts.preToolHook && opts.cmd.length > 0) {
-  printError(message`--pre-tool-hook reads the command from stdin and takes no COMMAND`, { exitCode: 1 });
+  process.stderr.write("--pre-tool-hook reads the command from stdin and takes no COMMAND\n");
+  process.exit(EXIT_BLOCKED);
 }
 if (!opts.preToolHook && opts.cmd.length === 0) {
   printError(message`missing COMMAND (use --pre-tool-hook to read hook JSON from stdin)`, { exitCode: 1 });
